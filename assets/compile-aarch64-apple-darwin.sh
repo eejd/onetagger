@@ -1,17 +1,20 @@
 #!/bin/bash
 set -e
 
+export BASE_DIR=`pwd`
+if [ ! -e dist ]; then mkdir dist; fi
+
 # this may be useful: https://www.linkedin.com/pulse/rust-makes-cross-compilation-childs-play-marco-ieni/
 # Intended for Github Actions
 # Requires MacOS [x86, aarch64], rustup and nodejs, pnpm installed
 # sudo apt update
 # sudo apt install -y autogen libasound2-dev pkg-config make libssl-dev gcc g++ curl wget git libwebkit2gtk-4.0-dev
 # Compile UI
-cd client
+cd $BASE_DIR/client
 pnpm i
 pnpm run build
-cd ..
-mkdir dist
+cd $BASE_DIR
+
 # Compile for linux
 # cargo build --release
 # strip target/release/onetagger
@@ -41,22 +44,22 @@ cd ..
 # cp assets/mac-cross.toml .cargo/config.toml
 # Compile 1t
 `cargo install cargo-bundle`
-cd crates/onetagger
+cd $BASE_DIR/crates/onetagger
 cargo bundle --target aarch64-apple-darwin --release
-cd -
+cd $BASE_DIR/crates
 cargo build --target aarch64-apple-darwin --release --bin onetagger-cli
 # aarch64-apple-darwin14-strip target/aarch64-apple-darwin/release/onetagger
 # aarch64-apple-darwin14-strip target/aarch64-apple-darwin/release/onetagger-cli
 # Create own zip with proper permissions
-cd target/aarch64-apple-darwin/release/bundle/osx
+cd $BASE_DIR/target/aarch64-apple-darwin/release/bundle/osx
 # aarch64-apple-darwin14-strip OneTagger.app/Contents/MacOS/onetagger
 chmod +x OneTagger.app/Contents/MacOS/onetagger
 zip -r OneTagger-mac.zip .
 cd -
-mv target/aarch64-apple-darwin/release/bundle/osx/OneTagger-mac.zip dist/
+mv $BASE_DIR/target/aarch64-apple-darwin/release/bundle/osx/OneTagger-mac.zip $BASE_DIR/dist/
 # CLI
-cd target/aarch64-apple-darwin/release
+cd $BASE_DIR/target/aarch64-apple-darwin/release
 chmod +x onetagger-cli
 zip OneTagger-mac-cli.zip onetagger-cli
-cd -
-mv target/aarch64-apple-darwin/release/OneTagger-mac-cli.zip dist/
+cd $BASE_DIR
+mv $BASE_DIR/target/aarch64-apple-darwin/release/OneTagger-mac-cli.zip $BASE_DIR/dist/
