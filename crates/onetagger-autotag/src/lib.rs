@@ -279,6 +279,13 @@ impl TrackImpl for Track {
                 Ok(data) => {
                     match data {
                         Some(data) => {
+                            // Remove covers
+                            if config.remove_all_covers {
+                                for t in CoverType::types() {
+                                    tag.remove_art(t);
+                                }
+                            }
+
                             tag.set_art(CoverType::CoverFront, "image/jpeg", Some("Cover"), data.clone());
                             // Save to file
                             if config.album_art_file {
@@ -436,16 +443,13 @@ impl AudioFileInfoImpl for AudioFileInfo {
             title = title.map(|t| re.replace_all(&t, "").to_string());
         }
 
-        // Validate artists
-        let artists = artists.ok_or("Missing artist tag!")?;
-        artists.first().ok_or("Artist tag empty!")?;
 
         // Track number
         let track_number = tag.get_field(Field::TrackNumber).unwrap_or(vec![String::new()])[0].parse().ok();
         Ok(AudioFileInfo {
             format: tag_wrap.format(),
             title,
-            artists,
+            artists: artists.ok_or("Missing artist tag!")?,
             path: path.to_owned(),
             isrc: tag.get_field(Field::ISRC).unwrap_or(vec![]).first().map(String::from),
             duration: None,
