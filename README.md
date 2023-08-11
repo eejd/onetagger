@@ -41,6 +41,10 @@ SongRec (Shazam support) - https://github.com/marin-m/SongRec
 ## Support
 You can support this project by donating on [PayPal](https://paypal.me/marekkon5) or [Patreon](https://www.patreon.com/onetagger)
 
+## Custom Platforms
+You can create custom Auto Tagger platforms for One Tagger. Instructions and template: 
+[Template](https://github.com/Marekkon5/onetagger-platform-template/)
+
 ## Compilling
 
 ### Linux & Mac
@@ -48,7 +52,7 @@ Mac version is cross compiled from linux, the build script is designed to run on
 
 **Install remaining dependencies**
 ```
-sudo apt install -y autogen libasound2-dev pkg-config make libssl-dev gcc g++ curl wget git libwebkit2gtk-4.0-dev
+sudo apt install -y autogen libasound2-dev pkg-config make libssl-dev gcc g++ curl wget git libwebkit2gtk-4.1-dev
 ```
 
 **Compile UI**

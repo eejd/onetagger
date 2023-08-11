@@ -51,7 +51,7 @@
         <!-- Thin tracks -->
         <div :style='`width: ${tracklistWidth}`'>
             <div v-for='(item, i) in tracks' :key='item.path' v-if='$1t.settings.value.quickTag.thinTracks'>
-                <q-intersection style='height: 32px;' @click.native='(e: MouseEvent) => trackClick(item, e)' once >
+                <q-intersection style='height: 32px;' @click.native='(e: MouseEvent) => trackClick(item, e)' once>
                     <QuickTagTileThin :track='item' :odd='i % 2 == 1'></QuickTagTileThin>
                 </q-intersection>
             </div>
@@ -173,7 +173,11 @@ const failedDialog = ref(false);
 // Click on track card
 function trackClick(track: QTTrack, event: MouseEvent) {
     // Add track to list
-    if (event.ctrlKey || event.metaKey) {
+    if (event.ctrlKey || event.metaKey || ($1t.info.value.os == 'macos' && event.altKey)) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
         selectionCursor = tracks.value.findIndex(t => t.path == track.path);
         $1t.toggleQTTrack(track);
         return;
