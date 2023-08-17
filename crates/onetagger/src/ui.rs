@@ -3,13 +3,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 use include_dir::Dir;
 use onetagger_player::AudioSources;
+use onetagger_shared::Settings;
 use rouille::{router, Response};
 use serde::{Serialize, Deserialize};
 use wry::application::dpi::{Size, PhysicalSize};
 use wry::application::event::{StartCause, Event, WindowEvent};
-use wry::application::event_loop::{EventLoop, ControlFlow};
-use wry::application::window::{WindowBuilder, Theme};
-use wry::webview::{WebViewBuilder, FileDropEvent};
+use wry::application::event_loop::{ControlFlow, EventLoopBuilder};
+use wry::application::window::{WindowBuilder, Theme, Icon};
+use wry::webview::{WebViewBuilder, FileDropEvent, WebContext};
 
 use crate::quicktag::QuickTagFile;
 
@@ -28,19 +29,45 @@ pub struct StartContext {
 /// Start webview window
 pub fn start_webview() -> Result<(), Box<dyn Error>> {
     // Setup wry
-    let event_loop = EventLoop::with_user_event();
+    let event_loop = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let window = WindowBuilder::new()
         .with_title("One Tagger")
         .with_min_inner_size(Size::Physical(PhysicalSize::new(1150, 550)))
         .with_inner_size(Size::Physical(PhysicalSize::new(1280, 720)))
         .with_resizable(true)
+        .with_window_icon(Some(Icon::from_rgba(include_bytes!("../../../assets/64x64.bin").to_vec(), 64, 64).unwrap()))
         .with_theme(Some(Theme::Dark))
         .build(&event_loop)?;
-    let webview = WebViewBuilder::new(window)?
+    window.set_inner_size(Size::Physical(PhysicalSize::new(1280, 720)));
+    let mut context = WebContext::new(Some(Settings::get_folder()?.join("webview")));
+    let mut webview = WebViewBuilder::new(window)?
         .with_url("http://127.0.0.1:36913")?
-        // Handle dropped folders
-        .with_file_drop_handler(move |_window, event| {
+        .with_web_context(&mut context);
+
+    // Windows webview2 does NOT support custom DnD, janky workaround
+    if cfg!(target_os = "windows") {
+        // Handler
+        let proxy = proxy.clone();
+        let handle_url = move |url: String| -> bool {
+            debug!("Navigation/NewWindow to: {url}");
+            if url.starts_with("file://") {
+                let url = url.replace("file:///", "");
+                let path = urlencoding::decode(&url).map(|r| r.to_string()).unwrap_or(url).replace("/", "\\");
+                proxy.send_event(CustomWindowEvent::DropFolder(path.into())).ok();
+                return false;
+            }
+            true
+        };
+        
+        // Register
+        webview = webview.with_navigation_handler(handle_url.clone());
+        webview = webview.with_new_window_req_handler(handle_url);
+    }
+
+    // Handle dropped folders (for all other than Windows)
+    if cfg!(not(target_os = "windows")) {
+        webview = webview.with_file_drop_handler(move |_window, event| {
             match event {
                 FileDropEvent::Dropped { mut paths, .. } => {
                     if paths.len() > 1 || paths.is_empty() {
@@ -60,9 +87,11 @@ pub fn start_webview() -> Result<(), Box<dyn Error>> {
             }
 
             true
-        })
-        .build()?;
+        });
+    }
 
+    // Create webview
+    let webview = webview.build()?;
 
     // Event loop
     event_loop.run(move |event, _, control_flow| {
@@ -83,7 +112,7 @@ pub fn start_webview() -> Result<(), Box<dyn Error>> {
             },
             // Drop folder to client
             Event::UserEvent(CustomWindowEvent::DropFolder(path)) => {
-                match webview.evaluate_script(&format!("window.onWebviewEvent({{\"action\": \"browse\", \"path\": `{}`}})", path.to_string_lossy().replace("`", "\\`"))) {
+                match webview.evaluate_script(&format!("window.onWebviewEvent({{\"action\": \"browse\", \"path\": \"{}\"}})", path.to_string_lossy().replace("\\", "\\\\").replace("\"", "\\\""))) {
                     Ok(_) => {},
                     Err(e) => error!("Failed executing JS on webview: {e}"),
                 }

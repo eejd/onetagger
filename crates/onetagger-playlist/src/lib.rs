@@ -1,3 +1,5 @@
+#[macro_use] extern crate log;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -20,7 +22,7 @@ pub struct UIPlaylist {
 }
 
 impl UIPlaylist {
-    pub fn get_files(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    pub fn get_files(&self) -> Result<Vec<PathBuf>, Box<dyn Error>> {
         let files = match self.format {
             PlaylistFormat::M3U => {
                 // Decode base64 from JS
@@ -30,8 +32,10 @@ impl UIPlaylist {
             }
         };
         // Filter extensions
-        let out = files.iter().filter(|f| EXTENSIONS.iter().any(|e| f.to_lowercase().ends_with(e)))
-            .map(String::from).collect();
+        let out = files
+            .iter()
+            .filter(|f| EXTENSIONS.iter().any(|e| f.extension().unwrap_or_default().to_ascii_lowercase() == *e))
+            .map(PathBuf::from).collect();
         Ok(out)
     }
 }
@@ -43,7 +47,7 @@ pub enum PlaylistFormat {
 }
 
 
-pub fn get_files_from_playlist_file(path: impl AsRef<Path>) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn get_files_from_playlist_file(path: impl AsRef<Path>) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     // Validate extension
     if !PLAYLIST_EXTENSIONS.iter().any(|e| &&path.as_ref().extension().unwrap_or_default().to_string_lossy().to_lowercase() == e) {
         return Err(OTError::new("Unsupported playlist!").into());
@@ -63,12 +67,21 @@ pub fn get_files_from_playlist_file(path: impl AsRef<Path>) -> Result<Vec<String
 
 
 // Get file list from M3U playlist
-pub fn get_files_from_m3u(m3u: &str, base_path: Option<PathBuf>) -> Vec<String> {
+pub fn get_files_from_m3u(m3u: &str, base_path: Option<PathBuf>) -> Vec<PathBuf> {
     let clean = m3u.replace("\r", "\n").replace("\n\n", "\n");
     let entries = clean.split("\n");
     let mut out = vec![];
     for entry in entries {
         if !entry.starts_with("#") && !entry.starts_with("http://") && !entry.is_empty() {
+            // Decode
+            let entry = match urlencoding::decode(entry) {
+                Ok(e) => e.to_string(),
+                Err(e) => {
+                    warn!("Failed URLDecode: {e}");
+                    entry.to_string()
+                }
+            };
+
             if base_path.is_none() {
                 out.push(entry.trim().to_string());
             } else {
@@ -77,5 +90,5 @@ pub fn get_files_from_m3u(m3u: &str, base_path: Option<PathBuf>) -> Vec<String> 
             }
         }
     }
-    out
+    out.into_iter().map(|i| i.into()).collect()
 }
