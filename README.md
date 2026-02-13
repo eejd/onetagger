@@ -83,4 +83,3 @@ cargo build --release
 ```
 
 Output will be inside `target\release` folder.
-
