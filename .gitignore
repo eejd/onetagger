@@ -17,3 +17,4 @@ assets/vc_redist.x64.exe
 perf.data
 perf.data.old
 flamegraph.svg
+.DS_Store
